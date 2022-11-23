@@ -93,6 +93,8 @@ On IEEE version, we mis-swapped the predictions and targets when generate visual
 ### Citiation
 
 If you find our paper and this code useful in your research, please consider citing:
+
+```
 @article{zhang2022short,
   title={Short and long range relation based spatio-temporal transformer for micro-expression recognition},
   author={Zhang, Liangfei and Hong, Xiaopeng and Arandjelovi{\'c}, Ognjen and Zhao, Guoying},
@@ -102,3 +104,4 @@ If you find our paper and this code useful in your research, please consider cit
   pages={1-13},
   doi={10.1109/TAFFC.2022.3213509}
   }
+```
