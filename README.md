@@ -76,3 +76,9 @@ please ensure you model are in the same directory with LOSO.py.
 ### One more thing
 
 You can also evaluate my already-trained model. I have uploaded it to onedrive.
+
+
+### Correction of Confusion Matrix
+
+On IEEE version, we mis-swapped the predictions and targets when generate visualised confusion matrix images. Sorry for any confusion this may have caused. We have corrected our arXiv version and show the correct one here.
+![Confusion Matrix](SLSTT_CMs.png)
