@@ -1,4 +1,4 @@
-"""model.py - Model and module class for ViT.
+"""slstt.py - Model and module class for SLSTT.
    They are built to mirror those in the official Jax implementation.
 """
 

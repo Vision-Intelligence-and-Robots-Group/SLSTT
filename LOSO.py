@@ -1,8 +1,9 @@
 import os
 import argparse
+from os.path import join
 
-# os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3"
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 
 import torch
 import torch.nn as nn
@@ -12,9 +13,9 @@ import torch.optim
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
-from sklearn.metrics import f1_score, recall_score
+from sklearn.metrics import f1_score, recall_score, classification_report
 
-from pytorch_pretrained_vit import ViT, load_pretrained_weights
+from pytorch_pretrained_vit import ViT, load_pretrained_weights, ViTLSTM_nofc
 from datasets import ME_dataset
 from main import validate
 
@@ -22,6 +23,8 @@ from main import validate
 parser = argparse.ArgumentParser(description='LOSO MER')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
+parser.add_argument('-l', '--lstm', dest='lstm', action='store_true',
+                    help='use vit-lstm model')
 parser.add_argument('--start-sub', default=1, type=int, metavar='N',
                     help='start from this subject (default: 1)')
 parser.add_argument('--combined', dest='combined', action='store_true',
@@ -35,20 +38,22 @@ parser.add_argument('-b', '--batch-size', default=4, type=int,
                     help='mini-batch size (default: 4), this is the total '
                          'batch size of all GPUs on the current node when '
                          'using Data Parallel or Distributed Data Parallel')
-parser.add_argument('--image_size', default=224, type=int,
+parser.add_argument('--image_size', default=384, type=int,
                     help='image size')
 parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                     help='use pre-trained model')
 parser.add_argument('--finetune', dest='finetune', action='store_true',
                     help='use pre-trained model to finetune')
-parser.add_argument('-j', '--workers', default=1, type=int, metavar='N',
-                    help='number of data loading workers (default: 1)')
+parser.add_argument('--vitdir', default='', type=str, metavar='vit model path',
+                    help='dir to find pre-trained vit models (default: none)')
+parser.add_argument('-j', '--workers', default=8, type=int, metavar='N',
+                    help='number of data loading workers (default: 8)')
 parser.add_argument('--num-images', default=11, type=int,
                     help='the number of images in each sample. ')
 
 def main():
     args = parser.parse_args()
-    args.evaluate = True
+    
     if args.dataset == 'casme2' or args.dataset == 'casme2-EVM':
         sub_list = range(1,27)
     elif args.dataset == 'samm' or args.dataset == 'samm-EVM':
@@ -63,34 +68,48 @@ def main():
             num_classes = 5
         elif args.dataset == 'samm' or args.dataset == 'samm-EVM':
             num_classes = 5
-
-
-        model = ViT(args.arch, pretrained=args.pretrained, num_classes=num_classes, image_size=args.image_size)        
-        load_pretrained_weights(model, load_fc=False, weights_path='./jax_to_pytorch/weights/'+args.arch+'.pth')
+        if not args.lstm:
+            model = ViT(args.arch, pretrained=False, num_classes=num_classes, image_size=args.image_size)        
+            load_pretrained_weights(model, load_fc=False, weights_path='PyTorch_ViT/jax_to_pytorch/weights/'+args.arch+'.pth')
+        else:
+            model = ViTLSTM_nofc(args.arch, pretrained=False, num_classes=num_classes, image_size=args.image_size)
+            load_pretrained_weights(model.vit, load_fc=False, weights_path='PyTorch_ViT/jax_to_pytorch/weights/'+args.arch+'.pth')
 
         device = list(range(torch.cuda.device_count()))
-        #print(device)
-        #model = torch.nn.DataParallel(model, device_ids=device, output_device=device[-1]).cuda()
-        model = model.cuda()
+        model = torch.nn.DataParallel(model, device_ids=device, output_device=device[-1]).cuda()
         cudnn.benchmark = True
         criterion = nn.CrossEntropyLoss().cuda()
         loso(model, criterion, args, sub_list)
     else:
         for i in sub_list[sub_list.index(args.start_sub):]:
             print("train start without subject "+str(i))
-            os.system("python3 PyTorch_ViT/main.py --vit -d casme2 --epochs 40 --lr 0.001 --dir pth-001-4 --gpu 0 --finetune --resume ~/MER/ViT_MER/PyTorch_ViT/jax_to_pytorch/weights/model_best_ck+0.00005.pth.tar --num-images "+str(args.num_images)+" --batch-size "+str(args.batch_size)+" -s "+str(i))
-            # os.system("/home/hongxiaopeng/zlf/environment/python3/bin/python3 PyTorch_ViT/main.py --vit -d smic --epochs 40 --lr 0.001 --dir pth-001-4/casme2 --finetune --resume /home/hongxiaopeng/zlf/MER/ViT_MER/pth/model_best_sub15.pth.tar --num-images "+str(args.num_images)+" --batch-size "+str(args.batch_size)+" -s "+str(i))
+            if args.finetune:
+                os.system("/home/hongxiaopeng/zlf/environment/python3/bin/python3 PyTorch_ViT/finetune.py --vit --lr 0.00003 --batch-size "+str(args.batch_size)+" -s "+str(i))
+            elif args.lstm and not args.pretrained:
+                os.system("/home/hongxiaopeng/zlf/environment/python3/bin/python3 PyTorch_ViT/main_lstm.py --lstm --lr 0.001 --epoch 90 --batch-size "+str(args.batch_size)+" -s "+str(i))
+            elif args.lstm and args.pretrained and not args.combined:
+                if args.dataset == 'casme2' or args.dataset == 'casme2-EVM':
+                    os.system("/home/hongxiaopeng/zlf/environment/python3/bin/python3 PyTorch_ViT/main_lstm_nofc.py --lstm --lr 0.05 --epoch 40 -p 20 --dir pth-lstm-nofc-cos-05-4 --num-images "+str(args.num_images)+" --finetune --resume "+join(args.vitdir,'model_best_sub'+str(i).zfill(2)+'.pth.tar') + " -b "+str(args.batch_size)+" -s "+str(i))
+                elif args.dataset == 'samm' or args.dataset == 'samm-EVM':
+                    os.system("/home/hongxiaopeng/zlf/environment/python3/bin/python3 PyTorch_ViT/main_lstm_nofc.py --lstm --lr 0.05 --epoch 40 -p 20 -d samm --dir pth-lstm-nofc-cos-05-4 --num-images "+str(args.num_images)+"  --finetune --resume "+join(args.vitdir,'model_best_samm_'+str(i).zfill(3)+'.pth.tar') + " -b "+str(args.batch_size)+" -s "+str(i))
+                elif args.dataset == 'smic' or args.dataset == 'smic-EVM':
+                    os.system("/home/hongxiaopeng/zlf/environment/python3/bin/python3 PyTorch_ViT/main_lstm_nofc.py --lstm --lr 0.05 --epoch 40 -p 20 -d smic --dir pth-lstm-nofc-cos-05-4 --num-images "+str(args.num_images)+"  --finetune --resume "+join(args.vitdir,'model_best_smic_s'+str(i)+'.pth.tar') + " -b "+str(args.batch_size)+" -s "+str(i))
+            elif args.lstm and args.pretrained and args.combined:
+                if args.dataset == 'casme2' or args.dataset == 'casme2-EVM':
+                    os.system("/home/hongxiaopeng/zlf/environment/python3/bin/python3 PyTorch_ViT/main_lstm_nofc.py --lstm --lr 0.05 --epoch 40 -p 20 --combined --dir pth-lstm-combined-nofc-cos-05-4 --num-images "+str(args.num_images)+" --finetune --resume "+join(args.vitdir,'model_best_casme2_sub'+str(i).zfill(2)+'.pth.tar') + " -b "+str(args.batch_size)+" -s "+str(i))
+                elif args.dataset == 'samm' or args.dataset == 'samm-EVM':
+                    os.system("/home/hongxiaopeng/zlf/environment/python3/bin/python3 PyTorch_ViT/main_lstm_nofc.py --lstm --lr 0.05 --epoch 40 -p 20 --combined -d samm --dir pth-lstm-combined-nofc-cos-05-4 --num-images "+str(args.num_images)+"  --finetune --resume "+join(args.vitdir,'model_best_samm_'+str(i).zfill(3)+'.pth.tar') + " -b "+str(args.batch_size)+" -s "+str(i))
+                elif args.dataset == 'smic' or args.dataset == 'smic-EVM':
+                    os.system("/home/hongxiaopeng/zlf/environment/python3/bin/python3 PyTorch_ViT/main_lstm_nofc.py --lstm --lr 0.05 --epoch 40 -p 20 --combined -d smic --dir pth-lstm-combined-nofc-cos-05-4 --num-images "+str(args.num_images)+"  --finetune --resume "+join(args.vitdir,'model_best_smic_s'+str(i)+'.pth.tar') + " -b "+str(args.batch_size)+" -s "+str(i))
+            else:
+                os.system("/home/hongxiaopeng/zlf/environment/python3/bin/python3 PyTorch_ViT/main.py --vit --lr 0.00003 --batch-size "+str(args.batch_size)+" -s "+str(i))
 
 def loso(model, criterion, args, sub_list):
     outputs_loso, targets_loso = [], []
     for i in sub_list[sub_list.index(args.start_sub):]:
-        if args.dataset == 'casme2' or args.dataset == 'casme2-EVM':
-            path = './model_best_casme2_sub'+str(i).zfill(2)+'.pth.tar'
-        elif args.dataset == 'samm' or args.dataset == 'samm-EVM':
-            path = 'pth-0005-4/model_best_samm_'+str(i).zfill(3)+'.pth.tar'
-        elif args.dataset == 'smic' or args.dataset == 'smic-EVM':
-            path = 'pth-001-4/casme2/model_best_smic_s'+str(i)+'.pth.tar'
-        #path = 'pth/model_best_sub'+str(i).zfill(2)+'.pth.tar'
+        #path = 'pth-lstm-combined-nofc-cos-05-4/model_best_casme2_sub'+str(i).zfill(2)+'.pth.tar'
+        #path = 'pth-lstm-nofc-cos-05-4/model_best_samm_'+str(i).zfill(3)+'.pth.tar'
+        path = 'pth-lstm-nofc-cos-05-4/model_best_smic_s'+str(i)+'.pth.tar'
         if os.path.isfile(path):
             print("=> loading checkpoint '{}'".format(path))
             checkpoint = torch.load(path)
@@ -124,6 +143,7 @@ def loso(model, criterion, args, sub_list):
 	        dataset=args.dataset,
 	        Spatial=False,
 	        img_num=args.num_images)
+
         val_loader = torch.utils.data.DataLoader(
             val_dataset, batch_size=args.batch_size, shuffle=False,
             num_workers=args.workers, pin_memory=True)
@@ -162,6 +182,7 @@ def res(output, target, topk=(1,)):
             acc.append(cor_k.item()/batch_size*100)
             correct_k = correct[:k].sum(0)
             pred_k = torch.where(correct_k==0, pred[0], target)
+            print(classification_report(target.numpy().tolist(), pred_k.numpy().tolist()))
             f1.append(f1_score(target.numpy().tolist(), pred_k.numpy().tolist(), average='macro'))
             uar.append(recall_score(target.numpy().tolist(), pred_k.numpy().tolist(), average='macro'))
         return cor, acc, f1, uar

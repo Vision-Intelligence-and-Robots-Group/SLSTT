@@ -171,7 +171,7 @@ class ViT(nn.Module):
         return x
 
 
-class ViTLSTM_nofc(nn.Module):
+class SLSTT(nn.Module):
     def __init__(
         self, 
         name: Optional[str] = None, 
@@ -179,7 +179,7 @@ class ViTLSTM_nofc(nn.Module):
         image_size: Optional[int] = None,
         num_classes: Optional[int] = None,
     ):
-        super(ViTLSTM_nofc, self).__init__()
+        super(SLSTT, self).__init__()
         self.vit = ViT(name=name,pretrained=pretrained,image_size=image_size,num_classes=num_classes)
         self.lstm = nn.LSTM(input_size=768, hidden_size=512, num_layers=3)
         self.fc1 = nn.Linear(512, 256)
