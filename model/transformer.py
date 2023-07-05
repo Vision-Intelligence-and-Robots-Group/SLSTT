@@ -1,7 +1,3 @@
-"""
-Adapted from https://github.com/lukemelas/simple-bert
-"""
- 
 import numpy as np
 import torch
 from torch import nn

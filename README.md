@@ -12,76 +12,65 @@ The whole code is not available now, but you can use
 python LOSO.py -e
 ```
 
-to test the Existing models.
+to test the exisitng example models, which could be download from [huggingface](https://huggingface.co/zlf-ffff/SLSTT).
 
-### Requirements&Environments
+<!-- ### Requirements&Environments
 
 * I train this model on single 3090
-* you can import my environment by environments.yaml, which may add many unnecessary packages.You can also simply pip install when you find it is necessary.
+* you can import my environment by environments.yaml, which may add many unnecessary packages.You can also simply pip install when you find it is necessary. -->
 
 ### Before training
 
 1. ##### How the dataset should be located
 
-   you can see the following data directory
+  You can see the following data directory
 
-   -data -data_raw
+  -preprocess/databases
 
-   ​		  -landmarks
 
-   Please put the raw data in <data_raw>;
+  Please put the raw data in <preprocess/databases/DATABASE/data>;
 
-   for example:
+  for example:
 
-   -data -data_raw
+  -preprocess/databases/casme2/data			
 
-   ​							-casme2
+2. ##### How to preprocess the samples
+  You can simplely run 
+  ```
+  python preprocess/data_init.py 
+  ```	
+  to generate all long-term optical flow input images from SMIC, CASME II and SAMM databases.
 
-   ​											-sub01
+### Training
 
-   ​											-sub02
 
-   ​											...						
+You can simply use:
 
-2. ##### change the PATH
+```
+python main.py -d DATABASE -s S
+```
+or 
+```
+python LOSO.py -d DATABASE
+```
 
-   Change line 16 PATH = 'xxx', this path should be where you put your datasets, for example:
-
-   home  -Leo  -data -data_raw
-
-   ​		                        -landmarks
-
-   you should let PATH = '/home/Leo/data'
-
-### Start training
-
-1. ##### How to start training
-
-   you can simply use:
-
-   `python main.py --vit -s 1 --dir ./`
-
-   to run the basic vit_mer, for further training(there is also alternative option) please carefully read the code.
+to run slstt for <DATABASE> ("smic", "casme2", "samm" or "com-DATABASE") and left subject S for validation, for further training(there is also alternative option) please carefully read the code.
 
 ### Evaluate
 
 ```
-python main.py --vit --resume xxx --evaluate
+python main.py -d DATABASE -s S --modal-path XXX -e
 ```
 
-fill the xxx with your checkpoint path
+Fill the XXX with your checkpoint path with leave subject S out.
 
-also you can evaluate with LOSO
+Also you can evaluate with LOSO start from subjuect S, (for examle, samm should start from subject 6).
 
 ```
-python LOSO.py -e
+python LOSO.py -d DATABASE --start-sub S  --dir FOLDER -e
 ```
 
-please ensure you model are in the same directory with LOSO.py.
-
-### One more thing
-
-You can also evaluate my already-trained model. I have uploaded it to onedrive.
+Please ensure all your models for <DATABASE> ("com" for composite dataset of CDE) are in <FOLDER>.
 
 
 ### Correction of Confusion Matrix

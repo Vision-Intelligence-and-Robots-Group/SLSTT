@@ -7,8 +7,8 @@ from RIFE.model.RIFE_HD import Model
 import warnings
 warnings.filterwarnings("ignore")
 
-#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = torch.device("cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cpu")
 
 # parser = argparse.ArgumentParser(description='Interpolation for a pair of images')
 # parser.add_argument('--img', dest='img', nargs=2, required=True)
@@ -20,7 +20,7 @@ def interpolate(img0, img1):
         torch.backends.cudnn.enabled = True
         torch.backends.cudnn.benchmark = True
     model = Model()
-    model.load_model('PyTorch_ViT/RIFE/train_log', -1)
+    model.load_model('RIFE/train_log', -1)
     model.eval()
     model.device()
 

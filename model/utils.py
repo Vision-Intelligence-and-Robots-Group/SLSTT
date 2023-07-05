@@ -1,15 +1,9 @@
-"""utils.py - Helper functions
-"""
-
 import numpy as np
 import torch
 from torch.utils import model_zoo
 
-from .configs import PRETRAINED_MODELS
-
 def load_pretrained_weights(
     model, 
-    model_name=None, 
     weights_path=None, 
     load_first_conv=True, 
     load_fc=True, 
@@ -29,16 +23,10 @@ def load_pretrained_weights(
         load_fc (bool): Whether to load pretrained weights for fc layer at the end of the model.
         resize_positional_embedding=False,
         verbose (bool): Whether to print on completion
-    """
-    assert bool(model_name) ^ bool(weights_path), 'Expected exactly one of model_name or weights_path'
-    
+    """    
     # Load or download weights
     if weights_path is None:
-        url = PRETRAINED_MODELS[model_name]['url']
-        if url:
-            state_dict = model_zoo.load_url(url)
-        else:
-            raise ValueError(f'Pretrained model for {model_name} has not yet been released')
+        raise ValueError(f'Pretrained model has not yet been released')
     else:
         state_dict = torch.load(weights_path)
 
@@ -60,8 +48,8 @@ def load_pretrained_weights(
         state_dict['positional_embedding.pos_embedding'] = \
             resize_positional_embedding_(posemb=posemb, posemb_new=posemb_new, 
                 has_class_token=hasattr(model, 'class_token'))
-        maybe_print('Resized positional embeddings from {} to {}'.format(
-                    posemb.shape, posemb_new.shape), verbose)
+        # maybe_print('Resized positional embeddings from {} to {}'.format(
+        #             posemb.shape, posemb_new.shape), verbose)
 
     # Load state dict
     ret = model.load_state_dict(state_dict, strict=False)

@@ -8,8 +8,7 @@ from torch import nn
 from torch.nn import functional as F
 
 from .transformer import Transformer
-from .utils import load_pretrained_weights, as_tuple
-from .configs import PRETRAINED_MODELS
+from .utils import as_tuple
 
 class PositionalEmbedding1D(nn.Module):
     """Adds (optionally learned) positional embeddings to the inputs."""
@@ -27,7 +26,6 @@ class ViT(nn.Module):
     """
     Args:
         name (str): Model name, e.g. 'B_16'
-        pretrained (bool): Load pretrained weights
         in_channels (int): Number of channels in input data
         num_classes (int): Number of classes, default 1000
 
@@ -37,8 +35,6 @@ class ViT(nn.Module):
 
     def __init__(
         self, 
-        name: Optional[str] = None, 
-        pretrained: bool = False, 
         patches: int = 16,
         dim: int = 768,
         ff_dim: int = 3072,
@@ -51,41 +47,17 @@ class ViT(nn.Module):
         classifier: str = 'token',
         positional_embedding: str = '1d',
         in_channels: int = 3, 
-        image_size: Optional[int] = None,
+        input_size: Optional[int] = None,
         num_classes: Optional[int] = None,
+        aggregation: str = 'LSTM'
+
     ):
         super().__init__()
-
-        # Configuration
-        if name is None:
-            check_msg = 'must specify name of pretrained model'
-            assert not pretrained, check_msg
-            assert not resize_positional_embedding, check_msg
-            if num_classes is None:
-                num_classes = 1000
-            if image_size is None:
-                image_size = 384
-        else:  # load pretrained model
-            assert name in PRETRAINED_MODELS.keys(), \
-                'name should be in: ' + ', '.join(PRETRAINED_MODELS.keys())
-            config = PRETRAINED_MODELS[name]['config']
-            patches = config['patches']
-            dim = config['dim']
-            ff_dim = config['ff_dim']
-            num_heads = config['num_heads']
-            num_layers = config['num_layers']
-            attention_dropout_rate = config['attention_dropout_rate']
-            dropout_rate = config['dropout_rate']
-            representation_size = config['representation_size']
-            classifier = config['classifier']
-            if image_size is None:
-                image_size = PRETRAINED_MODELS[name]['image_size']
-            if num_classes is None:
-                num_classes = PRETRAINED_MODELS[name]['num_classes']
-        self.image_size = image_size                
+        self.aggregation = aggregation
+        self.input_size = input_size                
 
         # Image and patch sizes
-        h, w = as_tuple(image_size)  # image sizes
+        h, w = as_tuple(input_size)  # image sizes
         fh, fw = as_tuple(patches)  # patch sizes
         gh, gw = h // fh, w // fw  # number of patches
         seq_len = gh * gw
@@ -122,19 +94,6 @@ class ViT(nn.Module):
         # Initialize weights
         self.init_weights()
         
-        # Load pretrained model
-        if pretrained:
-            pretrained_num_channels = 3
-            pretrained_num_classes = PRETRAINED_MODELS[name]['num_classes']
-            pretrained_image_size = PRETRAINED_MODELS[name]['image_size']
-            load_pretrained_weights(
-                self, name, 
-                load_first_conv=(in_channels == pretrained_num_channels),
-                load_fc=(num_classes == pretrained_num_classes),
-                load_repr_layer=load_repr_layer,
-                resize_positional_embedding=(image_size != pretrained_image_size),
-            )
-        
     @torch.no_grad()
     def init_weights(self):
         def _init(m):
@@ -167,32 +126,41 @@ class ViT(nn.Module):
             x = torch.tanh(x)
         if hasattr(self, 'fc'):
             x = self.norm(x)[:, 0]  # b,d
-            #x = self.fc(x)  # b,num_classes
+            if self.aggregation == 'Mean':
+                x = self.fc(x)  # b,num_classes
         return x
 
 
 class SLSTT(nn.Module):
     def __init__(
         self, 
-        name: Optional[str] = None, 
-        pretrained: bool = False,
-        image_size: Optional[int] = None,
-        num_classes: Optional[int] = None,
+        input_size: int = 384,
+        num_classes: int = 3,
+        aggregation: str = 'LSTM'
     ):
-        super(SLSTT, self).__init__()
-        self.vit = ViT(name=name,pretrained=pretrained,image_size=image_size,num_classes=num_classes)
+        super(SLSTT, self).__init__()#
+        self.aggregation = aggregation
+        self.vit = ViT(input_size=input_size,num_classes=num_classes, aggregation=aggregation)
         self.lstm = nn.LSTM(input_size=768, hidden_size=512, num_layers=3)
         self.fc1 = nn.Linear(512, 256)
         self.fc2 = nn.Linear(256, num_classes)
        
-    def forward(self, x_3d):
-        hidden = None
-        for t in range(x_3d.size(1)):
-            with torch.no_grad():
-                x = self.vit(x_3d[:, t, :, :, :])  
-            out, hidden = self.lstm(x.unsqueeze(0), hidden)         
+    def forward(self, x_sequence):
+        if self.aggregation == 'LSTM':
+            hidden = None
+            for t in range(x_sequence.size(1)):
+                # with torch.no_grad():
+                x = self.vit(x_sequence[:, t, :, :, :])  
+                out, hidden = self.lstm(x.unsqueeze(0), hidden)         
 
-        x = self.fc1(out[-1, :, :])
-        x = F.relu(x)
-        x = self.fc2(x)
+            x = self.fc1(out[-1, :, :])
+            x = F.relu(x)
+            x = self.fc2(x)
+        else:
+            B = x_sequence.shape[0]
+            x_sequence = torch.flatten(x_sequence, start_dim=0, end_dim=1)
+            x = self.vit(x_sequence)
+            x = x.view(B,int(x.shape[0]/B),x.shape[1])
+            x = torch.mean(x,1)
+
         return x

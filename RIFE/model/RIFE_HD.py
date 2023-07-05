@@ -10,8 +10,8 @@ from RIFE.model.IFNet_HD import *
 import torch.nn.functional as F
 from RIFE.model.loss import *
 
-#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = torch.device("cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cpu")
 
 
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
@@ -177,11 +177,11 @@ class Model:
                 return param
         if rank <= 0:
             self.flownet.load_state_dict(
-                convert(torch.load('{}/flownet.pkl'.format('/home/home/laizhengqin/code/PyTorch_ViT/RIFE/train_log/'), map_location=device)))
+                convert(torch.load('{}/flownet.pkl'.format(path), map_location=device)))
             self.contextnet.load_state_dict(
-                convert(torch.load('{}/contextnet.pkl'.format('/home/home/laizhengqin/code/PyTorch_ViT/RIFE/train_log/'), map_location=device)))
+                convert(torch.load('{}/contextnet.pkl'.format(path), map_location=device)))
             self.fusionnet.load_state_dict(
-                convert(torch.load('{}/unet.pkl'.format('/home/home/laizhengqin/code/PyTorch_ViT/RIFE/train_log/'), map_location=device)))
+                convert(torch.load('{}/unet.pkl'.format(path), map_location=device)))
 
     def save_model(self, path, rank):
         if rank == 0:
