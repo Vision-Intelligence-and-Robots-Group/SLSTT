@@ -25,7 +25,9 @@ to test the exisitng example models, which could be download from [huggingface](
   You can see data directory <preprocess/databases>.
 
 
-  Please put the raw data in <preprocess/databases/DATABASE/data>, for example: **<preprocess/databases/casme2/data>**.
+  Please put the raw data in <preprocess/databases/DATABASE/data>, for example:
+  
+  **<preprocess/databases/casme2/data>**.
 
   After putting the raw data in the correct directory, you can simplely run 
   ```
