@@ -21,21 +21,13 @@ to test the exisitng example models, which could be download from [huggingface](
 
 ### Before training
 
-1. ##### How the dataset should be located
 
-  You can see the following data directory
-
-  -preprocess/databases
+  You can see data directory <preprocess/databases>.
 
 
-  Please put the raw data in <preprocess/databases/DATABASE/data>;
+  Please put the raw data in <preprocess/databases/DATABASE/data>, for example: **<preprocess/databases/casme2/data>**.
 
-  for example:
-
-  -preprocess/databases/casme2/data			
-
-2. ##### How to preprocess the samples
-  You can simplely run 
+  After putting the raw data in the correct directory, you can simplely run 
   ```
   python preprocess/data_init.py 
   ```	
@@ -54,9 +46,10 @@ or
 python LOSO.py -d DATABASE
 ```
 
-to run slstt for <DATABASE> ("smic", "casme2", "samm" or "com-DATABASE") and left subject S for validation, for further training(there is also alternative option) please carefully read the code.
+to run slstt for **DATABASE** ("smic", "casme2", "samm" or "com-DATABASE") and left subject S for validation, for further training(there is also alternative option) please carefully read the code.
 
 ### Evaluate
+
 
 ```
 python main.py -d DATABASE -s S --modal-path XXX -e
@@ -70,16 +63,18 @@ Also you can evaluate with LOSO start from subjuect S, (for examle, samm should 
 python LOSO.py -d DATABASE --start-sub S  --dir FOLDER -e
 ```
 
-Please ensure all your models for <DATABASE> ("com" for composite dataset of CDE) are in <FOLDER>.
+Please ensure all your models for **DATABASE** ("com" for composite dataset of CDE) are in **FOLDER**.
 
 
 ### Correction of Confusion Matrix
+
 
 On IEEE version, we mis-swapped the predictions and targets when generate visualised confusion matrix images. Sorry for any confusion this may have caused. We have corrected our arXiv version and show the correct one here.
 
 ![Confusion Matrix](images/SLSTT_CMs.png)
 
 ### Citiation
+
 
 If you find our paper and this code useful in your research, please consider citing:
 
