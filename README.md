@@ -41,7 +41,7 @@ to test the exisitng example models, which could be download from [huggingface](
 You can simply use:
 
 ```
-python main.py -d DATABASE -s S
+python trainer.py -d DATABASE -s S
 ```
 or 
 ```
